@@ -12,14 +12,16 @@
 // Include Particle Device OS APIs
 #include "Particle.h"
 #include "IOTClassroom_CNM.h"
-#include <Encoder.h>
-#include "neopixel.h"
 #include "Adafruit_GFX.h"
 #include "Adafruit_SSD1306.h"
+#include <Encoder.h>
+#include "neopixel.h"
 
 //OLED DEFINES
 #define OLED_RESET D4
-Adafruit_SSD1306 display(OLED_RESET);
+Adafruit_SSD1306 display1(OLED_RESET);
+Adafruit_SSD1306 display2(OLED_RESET);
+
 
 #define NUMFLAKES 10
 #define XPOS 0
@@ -45,6 +47,11 @@ static const unsigned char logo16_glcd_bmp[] =
   0B01111100, 0B11110000,
   0B01110000, 0B01110000,
   0B00000000, 0B00110000 };
+
+  //OLED SCREEN REALTED
+#if (SSD1306_LCDHEIGHT != 64)
+#error("Height incorrect, please fix Adafruit_SSD1306.h!");
+#endif
 
 //Setting Bools
 bool updown = false; //Initialize the LED state to off
@@ -73,11 +80,17 @@ int end = numPixels -1; // Set the end index to the last pixel
 //Setting Variables for Buzzer
 int buzzer = D16;
 int frequency = 1000;
-int duration = 2000;
+int duration = 1000;
 
 //Setting HUE Lights Constants
 const int BULB =3;
 int color;
+
+//Setting Time Inegers
+int hour = 1;
+int minute = 1;
+int alarmHour;
+int alarmMinute;
 
 //Setting i as and Integer for multiple use cases
 int i;
@@ -89,6 +102,7 @@ String ONOFF;
 Encoder myEnc(PINA, PINB);
 Servo rightLEG;
 Servo leftLEG;
+String DateTime , TimeOnly;
 
 
 // Setting Particles Connection Protocols
@@ -100,10 +114,7 @@ SYSTEM_THREAD(ENABLED);
 //Setting Encoder CLass for HUE Lights
 //class Encoder myEnc(PINA,PINB);
 
-//OLED SCREEN REALTED
-#if (SSD1306_LCDHEIGHT != 64)
-#error("Height incorrect, please fix Adafruit_SSD1306.h!");
-#endif
+
 
     void setup() {
         // Initializing Monitor Setup
@@ -130,19 +141,25 @@ SYSTEM_THREAD(ENABLED);
         pinMode(buzzer, OUTPUT);
 
         //OLED Setup
+        display1.begin(SSD1306_SWITCHCAPVCC, 0x3C);
         Serial.begin(9600);
-        display.setTextSize(4);
-        display.setTextColor(WHITE);
-        display.setCursor(0, 0);
+        display1.setTextSize(2);
+        display1.setTextColor(WHITE);
+        display1.setCursor(0, 0);
+        display1.setRotation(0);
+        display1.display(); // show splash screen
+        delay(2000);
+        display1.clearDisplay(); // clears the screen and buffer
 
-            // Configure and initialize the OLED display
-            display.begin(SSD1306_SWITCHCAPVCC, 0x3D);
-
-            // Set the rotation of the screen (90 degrees clockwise)
-            display.setRotation(0);
-            display.display(); // show splash screen
-            delay(2000);
-            display.clearDisplay(); // clears the screen and buffer
+        display2.begin(SSD1306_SWITCHCAPVCC, 0x3D);
+        Serial.begin(9600);
+        display2.setTextSize(2);
+        display2.setTextColor(WHITE);
+        display2.setCursor(0, 0);
+        display2.setRotation(0);
+        display2.display(); // show splash screen
+        delay(2000);
+        display2.clearDisplay(); // clears the screen and buffer
     
         //WIFI Connection Protocols (Purpose is fo Hue Lights and Wemo Outlet)
         //WiFi Connection Protocols
@@ -160,10 +177,9 @@ SYSTEM_THREAD(ENABLED);
         onOff = false;
     }
 
-
-    void loop() {
-        for (i = 0; i<numPixels; i++) {
-            pixel.setPixelColor(i, 255, 255, 255);
+    void loop() { //Test
+        for (i=0; i=numPixels; i++){
+            pixel.setPixelColor(i++, 255,255,0);
             pixel.setBrightness(30);
             pixel.show();
             pixel.clear();
@@ -173,42 +189,35 @@ SYSTEM_THREAD(ENABLED);
         // Servo Loop
         rightLEG.write(0);
         leftLEG.write(0);
+        
 
         //Encoder Loop
-        digitalWrite(GREENLED, LOW); // Set the green LED to ON
-        digitalWrite(REDLED, HIGH);  // Set the red LED to OFF
+        digitalWrite(GREENLED, HIGH); // Set the green LED to ON
+        digitalWrite(REDLED, LOW);  // Set the red LED to OFF
         digitalWrite(BLUELED, HIGH);  // Set the red LED to OFF
 
         //Buzzer Loop
-        //tone(buzzer, frequency, duration);
+        tone(buzzer, frequency, duration);
 
         //OLED Loop
             // Displaying name with a Spanish honorific
-            display.printf("SenÌor Rodolfo Parra");
-            display.display();
+            display1.printf("1");
+            display1.display();
             delay(2000);
-            display.clearDisplay();
+            display1.clearDisplay();
 
-            // Displaying birthday
-            int day = 8;
-            int month = 6;
-            int year = 1998;
-            display.printf("%02d/%02d/%04d", month, day, year);
-            display.display();
+            display2.printf("2");
+            display2.display();
             delay(2000);
-            display.clearDisplay();
+            display2.clearDisplay();
+            
 
-            // Displaying Hello World
-            display.printf("Hello World");
-            display.display();
-            delay(2000);
-            display.clearDisplay();
-        
         //Hue Lights Loop
         if (button.isClicked()){
             Serial.printf("Setting color of bulb &i to color %06i\n", BULB, HueRainbow[color%7]);
             onOff = !onOff;
-            setHue(BULB,onOff,HueGreen, random(32,255),255);
+            setHue(BULB,onOff, HueGreen, random(32,255),255);
             color++;
         }
     }
+
