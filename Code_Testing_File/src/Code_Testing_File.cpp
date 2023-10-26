@@ -178,7 +178,7 @@ SYSTEM_THREAD(ENABLED);
     }
 
     void loop() { //Test
-        for (i=0; i=numPixels; i++){
+        for (i=0; i = numPixels; i++){
             pixel.setPixelColor(i++, 255,255,0);
             pixel.setBrightness(30);
             pixel.show();
@@ -216,7 +216,7 @@ SYSTEM_THREAD(ENABLED);
         if (button.isClicked()){
             Serial.printf("Setting color of bulb &i to color %06i\n", BULB, HueRainbow[color%7]);
             onOff = !onOff;
-            setHue(BULB,onOff, HueGreen, random(32,255),255);
+            setHue(BULB,onOff, HueBlue, random(32,255),255);
             color++;
         }
     }
