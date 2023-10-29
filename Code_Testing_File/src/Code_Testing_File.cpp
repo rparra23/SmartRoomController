@@ -9,193 +9,194 @@
  */
 
 #include "Particle.h"
-#include "Button.h"
-#include "hue.h"
-#include "Colors.h"
-#include "wemo.h"
 #include "Adafruit_SSD1306.h"
-#include "Adafruit_GFX.h"
 #include <Encoder.h>
-#include "neopixel.h"
+#include "IoTClassroom_CNM.h"
+#include <neopixel.h>
 
-// OLED DEFINES
-#define OLED_RESET -1
+#define OLED_RESET    -1
+#define ENCODER_A_PIN D8
+#define ENCODER_B_PIN D9
+
+
+
 Adafruit_SSD1306 display1(OLED_RESET);
 Adafruit_SSD1306 display2(OLED_RESET);
+Encoder encoder(ENCODER_A_PIN, ENCODER_B_PIN);
+Servo rightLeg;
+Servo leftLeg;
 
-// Setting Bools
-bool updown = false; // Initialize the LED state to off
+//Setting Int for Time
+int hour = 1;   // Initialize the hour variable to 1
+int minute1 = 1; // Initialize the minute variable to 1
 
-// Declaring Pins for Encoder
+
+//Setting Constants
+    //HUE Bulb
+const int BULB = (3);
+int TOTALBULB = 6;
+int color;
+int clickCount = 0;
+    // Wemos
+  const int MYWEMO1 = 2;
+  const int MYWEMO2 = 0;
+  bool ONOFF;
+  bool wemoOn = false;
+  bool buttonPressed = false;
+    //Encoder
+const int BUTTONPIN = D15;
+int BUTTONSTATE;
+int lastButtonState  = HIGH;
+bool onOff = false;
 const int REDLED = D18;
 const int GREENLED = D17;
 const int BLUELED = D5;
-const int BUTTONPIN = D15;
-int ENCODER_A_PIN = D8;
-int ENCODER_B_PIN = D9;
+int ENCODER_BUTTON_PIN;
+const int buzzer = D16;
 
-// Declaring the State of Button
-int BUTTONSTATE = 0; // Initialize BUTTONSTATE to off
-int onOff;
 
-// Setting Encoders Starting Position
-int position = 0;
-int maxPos = 100;
-
-// Setting Variables for Buzzer
-int buzzer = D16;
-int frequency = 1000;
-int duration = 1000;
-
-// Setting HUE Lights Constants
-const int BULB = 3;
-int color;
-
-// Setting NeoPixels
+    //NeoPixels
 int numPixels = 12;
 int start = 0;
-int end = numPixels - 1; // Set the end index to the last pixel
-
-// Declare the NeoPixel object
+int end = numPixels -1;
+int i;
 Adafruit_NeoPixel pixel(numPixels, SPI1, WS2812B);
 
-// Setting Time Integers
-int currentHour = 12;
-int currentMinute = 0;
-int alarmHour;
-int alarmMinute;
-int currentTime;
 
-// Variable to keep track of button presses
-int buttonPresses = 0;
-int clickCount = 0; // Counter for button clicks
-bool adjustingHour = true; // Flag to indicate whether we are adjusting the hour or minute
-bool flashEnabled = false;
 
-// Declare the Encoder object
-Encoder myEnc(ENCODER_A_PIN, ENCODER_B_PIN);
+Button button(BUTTONPIN);
 
-//Setting Fucntions
-    void flashOLED();
-    void flashNeoPixel();
+//Setting Connection Protocols to Manual
+SYSTEM_MODE(MANUAL);
 
-SYSTEM_MODE(SEMI_AUTOMATIC);
+    void setup() {
+        //Serial Monitor
+        Serial.begin(9600);
+        waitFor(Serial.isConnected,15000);
 
-void setup() {
-    Serial.begin(9600);
-
-    // Initialize NeoPixel
-    pixel.begin();
-    pixel.show();
-    pixel.setBrightness(30);
-
-    // Initialize OLED
-    display1.begin(SSD1306_SWITCHCAPVCC, 0x3C);
-    display2.begin(SSD1306_SWITCHCAPVCC, 0x3D);
-    display1.display();
-    display2.display();
-    display1.clearDisplay();
-    display2.clearDisplay();
-    display1.display();
-    display2.display();
-
-    // Initialize button pin
-    pinMode(BUTTONPIN, INPUT_PULLUP);
-}
-
-void loop() {
-    // Check if the encoder button is pressed
-    int buttonState = digitalRead(BUTTONPIN);
-    if (buttonState == LOW) {
-        delay(50); // Debounce
-
-        // Count button presses
-        buttonPresses++;
-
-        if (buttonPresses == 1) {
-            // Single click: Enable flashing
-            flashEnabled = true;
-        } else if (buttonPresses == 2) {
-            // Double click: Exit time adjustment mode
-            flashEnabled = false;
+        //WiFi Connection Protocols
+        WiFi.on();
+        WiFi.clearCredentials();
+        WiFi.setCredentials("IoTNetwork");
+        WiFi.connect();
+        while(WiFi.connecting()) {
+            Serial.printf(".");
         }
+        Serial.printf("\n\n");
 
-        delay(250); // Delay to prevent multiple increments
-        buttonPresses = 0;
-    }
+        //Setting Encoder Inputs and Outputs
+        pinMode(BUTTONPIN, INPUT);
+        pinMode(GREENLED, OUTPUT);
+        pinMode(REDLED, OUTPUT);
+        pinMode(BLUELED, OUTPUT);
 
-    // Handle time adjustment when not in flashing mode
-    if (!flashEnabled) {
-        int encoderValue = myEnc.read();
-        if (encoderValue > 0) {
-            // Adjust hour
-            currentHour = (currentHour + 1) % 24;
-            myEnc.write(0); // Reset the encoder value
-        } else if (encoderValue < 0) {
-            // Adjust minute
-            currentMinute = (currentMinute + 1) % 60;
-            myEnc.write(0); // Reset the encoder value
-        }
-    }
 
-    // Handle flashing NeoPixel and OLED screens
-    if (flashEnabled) {
-        flashNeoPixel();
-        flashOLED();
-    } else {
-        // Format time as strings
-        String hourStr = String(currentHour);
-        String minuteStr = (currentMinute < 10 ? "0" : "") + String(currentMinute);
+        //Setting NeoPixel Commands
+        pixel.begin();
+        pixel.show();
+        pixel.setBrightness(30);
 
-        // Clear the OLED screens
+        //Servo Variable
+        rightLeg.attach(A2);
+        leftLeg.attach(A5);
+
+        //Servo Setup
+        pinMode(buzzer, OUTPUT);
+
+        //Setting OLED DISPLAY
+        display1.begin(SSD1306_SWITCHCAPVCC, 0x03C);
+        display2.begin(SSD1306_SWITCHCAPVCC, 0x03D);
+
         display1.clearDisplay();
         display2.clearDisplay();
 
-        // Setting the text size and color
-        display1.setTextSize(2);
+        display1.setTextSize(7);
         display1.setTextColor(WHITE);
-        display2.setTextSize(2);
+        //display1.setCursor(0, 0);
+        display2.setTextSize(7);
         display2.setTextColor(WHITE);
+        //display2.setCursor(30, 0);
 
-        display1.setCursor(80, 0);
-        display1.print(hourStr);
         display1.display();
-
-        display2.setCursor(50, 0);
-        display2.print(minuteStr);
         display2.display();
     }
-    
-}
 
-void flashNeoPixel() {
-    // NeoPixel flashing logic here
-    for (int i = 0; i < numPixels; i++) {
-        pixel.setPixelColor(i, 255, 0, 255);
-        pixel.setBrightness(30);
-        pixel.show();
-        pixel.clear();
-        delay(80);
-    }
-}
+    void loop() {
+        //NEOPixel
+        for (i = 0; i<16; i++) {
+            pixel.setPixelColor(i, 255, 255, 255);
+            pixel.setBrightness(30);
+            pixel.show();
+            pixel.clear();
+            delay(70);
+        }
 
-void flashOLED() {
-    static bool oledOn = false;
-    if (millis() % 1000 < 500) { // Flash the OLED screens every 1 second with 500ms on and 500ms off
-        if (!oledOn) {
-            display1.clearDisplay();
-            display2.clearDisplay();
-            display1.display();
-            display2.display();
-            oledOn = true;
+        //ButtonLED
+        digitalWrite(GREENLED, LOW); // Set the green LED to ON
+        digitalWrite(REDLED, HIGH); 
+        digitalWrite(BLUELED, HIGH); 
+
+        // Increment the minute
+        minute1++;
+        delay(60000);
+
+        // Check if the minute exceeds 59 and reset it to 1
+        if (minute1 > 59) {
+            minute1 = 1;
+            // Increment the hour when the minute resets to 1
+            hour++;
+            // Check if the hour exceeds 12, and if so, reset it to 1
+            if (hour > 12) {
+                hour = 1;
+            }
+             tone(buzzer, 1000);
+             delay(800);
+             noTone(buzzer);
         }
-    } else {
-        if (oledOn) {
+
+        // Display the current hour on display1 and minute on display2
             display1.clearDisplay();
-            display2.clearDisplay();
+            display1.setCursor(50, 0);
+            display1.print(hour);
             display1.display();
+            
+
+            // Display the current minute on display2
+            display2.clearDisplay();
+            display2.setCursor(30, 0);
+            display2.print(minute1);
             display2.display();
-            oledOn = false;
+
+        //HUE LOOP
+        if (button.isClicked()) {
+            clickCount++;
+
+            if (clickCount == 1) {
+                // First click, set color to HueViolet
+                Serial.printf("Setting color of bulb %i to HueViolet\n", BULB);
+                onOff = !onOff;
+                for (i=0; i<=TOTALBULB; i++){
+                setHue(i, onOff, HueGreen, random(32, 255), 255);
+                }
+            } else if (clickCount == 2) {
+                // Second click, turn off the Hue light
+                Serial.printf("Turning off Hue light for bulb %i\n", BULB);
+                onOff = false;
+                for (i=0; i<=TOTALBULB; i++){
+                setHue(i, onOff, 0, 0, 0); // Assuming 0, 0, 0 means turning off the light
+                }
+            } else if (clickCount ==3) {
+                wemoWrite(MYWEMO1,HIGH);
+                wemoWrite(MYWEMO2,HIGH);
+
+            } else if (clickCount ==4) {
+                wemoWrite(MYWEMO1,LOW);
+                wemoWrite(MYWEMO2,LOW);
+                clickCount = 0; // Reset click count to start over
+            }
         }
+        //Servo Loop
+        rightLeg.write(0);
+        leftLeg.write(0);
     }
-}
+
