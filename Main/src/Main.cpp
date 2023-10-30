@@ -38,7 +38,7 @@ int TOTALBULB = 6;
 int color;
 int clickCount = 0;
     // Wemos
-  const int MYWEMO1 = 3;
+  const int MYWEMO1 = 2;
   const int MYWEMO2 = 0;
   bool ONOFF;
   bool wemoOn = false;
@@ -138,7 +138,7 @@ SYSTEM_MODE(MANUAL);
 
         // Increment the minute
         minute1++;
-        delay(1000);
+        delay(60000);
 
         // Check if the minute exceeds 59 and reset it to 1
         if (minute1 > 59) {
